@@ -257,11 +257,11 @@ void setup() {
   pinMode(IN1_DC, OUTPUT);
   pinMode(IN2_DC, OUTPUT);
 
-  ledcSetup(LEDC_CHANNEL_ENTRADA, LEDC_FREQ, LEDC_RESOLUTION);
-  ledcAttachPin(ENB, LEDC_CHANNEL_ENTRADA);
+  // Configurar PWM para motor de entrada (versión moderna ESP32 Core 3.x)
+  ledcAttach(ENB, LEDC_FREQ, LEDC_RESOLUTION);
   
-  ledcSetup(LEDC_CHANNEL_SALIDA, LEDC_FREQ, LEDC_RESOLUTION);
-  ledcAttachPin(ENA, LEDC_CHANNEL_SALIDA);
+  // Configurar PWM para motor de salida (versión moderna ESP32 Core 3.x)
+  ledcAttach(ENA, LEDC_FREQ, LEDC_RESOLUTION);
 
   stepper.setSpeed(12);
   detenerMotorEntrada();
