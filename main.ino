@@ -86,21 +86,21 @@ float medirDistancia(int trigPin, int echoPin) {
 void encenderMotorEntrada() {
   digitalWrite(IN3, HIGH);
   digitalWrite(IN4, LOW);
-  ledcWrite(LEDC_CHANNEL_ENTRADA, 200);
+  ledcWrite(ENB, 200);  // Usar PIN directamente (ESP32 Core 3.x)
   motorEntradaEncendido = true;
 }
 
 void detenerMotorEntrada() {
   digitalWrite(IN3, LOW);
   digitalWrite(IN4, LOW);
-  ledcWrite(LEDC_CHANNEL_ENTRADA, 0);
+  ledcWrite(ENB, 0);  // Usar PIN directamente (ESP32 Core 3.x)
   motorEntradaEncendido = false;
 }
 
 void encenderMotorSalida() {
   digitalWrite(IN1_DC, HIGH);
   digitalWrite(IN2_DC, LOW);
-  ledcWrite(LEDC_CHANNEL_SALIDA, 200);
+  ledcWrite(ENA, 200);  // Usar PIN directamente (ESP32 Core 3.x)
   motorSalidaEncendido = true;
   Serial.println("Motor de salida ENCENDIDO (banda de salida activa)");
 }
@@ -108,7 +108,7 @@ void encenderMotorSalida() {
 void detenerMotorSalida() {
   digitalWrite(IN1_DC, LOW);
   digitalWrite(IN2_DC, LOW);
-  ledcWrite(LEDC_CHANNEL_SALIDA, 0);
+  ledcWrite(ENA, 0);  // Usar PIN directamente (ESP32 Core 3.x)
   motorSalidaEncendido = false;
   Serial.println("Motor de salida APAGADO");
 }
