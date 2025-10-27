@@ -1,0 +1,211 @@
+import tkinter as tk
+from tkinter import messagebox
+import serial
+import threading
+import time
+
+# ===== CONFIG == ===
+COM_PORT = 'COM36'   # <6- CAMBIAR al puerto real
+BAUDRATE = 115200
+SERIAL_TIMEOUT = 0.1
+
+# ===== Variables globales =====
+modo_seleccionado = None
+modo_confirmado = False
+
+# ===== Inicializar serial =====
+try:
+    arduino = serial.Serial(port=COM_PORT, baudrate=BAUDRATE, timeout=SERIAL_TIMEOUT)
+    time.sleep(2)
+except Exception as e:
+    arduino = None
+    print("No se pudo abrir el puerto serial:", e)
+
+# ===== Interfaz =====
+root = tk.Tk()
+root.title("Control de Compartimientos")
+root.geometry("380x400")
+root.configure(bg="#222")
+
+# ===== Frame de selección de modo =====
+modo_frame = tk.Frame(root, bg="#222")
+modo_frame.pack(pady=20)
+
+titulo_modo = tk.Label(modo_frame, text="Seleccioná el Modo de Operación", 
+                       fg="white", bg="#222", font=("Arial", 14, "bold"))
+titulo_modo.pack(pady=10)
+
+def seleccionar_modo(modo):
+    global modo_seleccionado, modo_confirmado
+    if arduino is None:
+        messagebox.showerror("Error", "Puerto serial no abierto.")
+        return
+    
+    modo_seleccionado = modo
+    comando = f"{modo}\n"
+    arduino.write(comando.encode('utf-8'))
+    
+    status_var.set(f"Enviando modo: {modo}... esperando confirmación")
+    btn_ingresar.config(state=tk.DISABLED)
+    btn_retirar.config(state=tk.DISABLED)
+
+btn_ingresar = tk.Button(modo_frame, text="INGRESAR TAPA", width=20, height=2,
+                         font=("Arial", 12, "bold"), bg="#28a745", fg="white",
+                         command=lambda: seleccionar_modo("INGRESAR"))
+btn_ingresar.pack(pady=8)
+
+btn_retirar = tk.Button(modo_frame, text="RETIRAR TAPA", width=20, height=2,
+                        font=("Arial", 12, "bold"), bg="#dc3545", fg="white",
+                        command=lambda: seleccionar_modo("RETIRAR"))
+btn_retirar.pack(pady=8)
+
+# ===== Frame de compartimientos (inicialmente oculto) =====
+compartimientos_frame = tk.Frame(root, bg="#222")
+
+titulo_comp = tk.Label(compartimientos_frame, text="Seleccioná Compartimiento", 
+                       fg="white", bg="#222", font=("Arial", 14))
+titulo_comp.pack(pady=12)
+
+buttons = []
+
+def enviar_comando(num):
+    if arduino is None:
+        messagebox.showerror("Error", "Puerto serial no abierto.")
+        return
+    if not hasattr(compartimientos_frame, 'buttons_enabled') or not compartimientos_frame.buttons_enabled:
+        messagebox.showinfo("Esperar", "El sistema no está listo. Esperá a que aparezca 'READY'.")
+        return
+    comando = f"{num}\n"
+    arduino.write(comando.encode('utf-8'))
+    status_var.set(f"Enviado: Compartimiento {num} (esperando MOVE_DONE)")
+    set_buttons_enabled(False)
+
+def set_buttons_enabled(enabled):
+    for b in buttons:
+        b.config(state=tk.NORMAL if enabled else tk.DISABLED)
+    compartimientos_frame.buttons_enabled = enabled
+
+btn_frame = tk.Frame(compartimientos_frame, bg="#222")
+btn_frame.pack(pady=8)
+
+for i in range(1, 5):
+    b = tk.Button(btn_frame, text=f"Compartimiento {i}", width=20, font=("Arial", 11),
+                  command=lambda i=i: enviar_comando(i), state=tk.DISABLED, bg="#444", fg="white")
+    b.grid(row=i-1, column=0, pady=6, padx=6)
+    buttons.append(b)
+
+compartimientos_frame.buttons_enabled = False
+
+# ===== Botón CONTINUAR (para modo RETIRAR) =====
+def continuar_ciclo():
+    if arduino is None:
+        messagebox.showerror("Error", "Puerto serial no abierto.")
+        return
+    comando = "CONTINUE\n"
+    arduino.write(comando.encode('utf-8'))
+    status_var.set("Continuando ciclo...")
+    btn_continuar.pack_forget()
+
+btn_continuar = tk.Button(compartimientos_frame, text="CONTINUAR (tapa colocada)", 
+                          width=25, font=("Arial", 10, "bold"),
+                          bg="#17a2b8", fg="white", command=continuar_ciclo)
+# No se muestra hasta que sea necesario
+
+# ===== Status label =====
+status_var = tk.StringVar()
+status_var.set("Estado: esperando conexión..." if arduino is None else "Estado: esperando selección de modo")
+
+status_label = tk.Label(root, textvariable=status_var, fg="#aaffaa", bg="#222", font=("Arial", 10))
+status_label.pack(pady=12)
+
+# ===== Botón para cambiar modo =====
+def volver_a_seleccion_modo():
+    global modo_seleccionado, modo_confirmado
+    modo_seleccionado = None
+    modo_confirmado = False
+    compartimientos_frame.pack_forget()
+    btn_cambiar_modo.pack_forget()
+    btn_continuar.pack_forget()  # Ocultar botón continuar también
+    modo_frame.pack(pady=20)
+    status_var.set("Estado: esperando selección de modo")
+    btn_ingresar.config(state=tk.NORMAL)
+    btn_retirar.config(state=tk.NORMAL)
+    set_buttons_enabled(False)
+
+btn_cambiar_modo = tk.Button(root, text="Cambiar Modo", width=15, font=("Arial", 9),
+                              bg="#ffc107", fg="black", command=volver_a_seleccion_modo, state=tk.DISABLED)
+
+# ===== Thread para leer serial =====
+def serial_reader_thread():
+    global arduino, modo_confirmado
+    if arduino is None:
+        return
+    
+    while True:
+        try:
+            line = arduino.readline().decode('utf-8', errors='ignore').strip()
+            if line:
+                print("RECIBIDO:", line)
+                
+                if line == "MODE_REQUEST":
+                    # Arduino solicita modo - mostrar pantalla de selección
+                    status_var.set("Ciclo completado. Seleccioná nuevo modo: INGRESAR o RETIRAR")
+                    btn_continuar.pack_forget()  # Ocultar botón continuar
+                    volver_a_seleccion_modo()
+                
+                elif line == "MODE_CONFIRMED":
+                    modo_confirmado = True
+                    modo_frame.pack_forget()
+                    compartimientos_frame.pack(pady=10)
+                    btn_cambiar_modo.pack(pady=10)
+                    btn_cambiar_modo.config(state=tk.NORMAL)
+                    if modo_seleccionado == "RETIRAR":
+                        status_var.set(f"Modo {modo_seleccionado} confirmado. Motor de salida activo. Esperando selección...")
+                    else:
+                        status_var.set(f"Modo {modo_seleccionado} confirmado. Esperando tapa...")
+                
+                elif line == "READY":
+                    set_buttons_enabled(True)
+                    if modo_seleccionado == "RETIRAR":
+                        status_var.set("Estado: READY - Seleccioná compartimiento para RETIRAR tapa")
+                    else:
+                        status_var.set("Estado: READY - Seleccioná compartimiento para INGRESAR tapa")
+                
+                elif line == "MOVE_DONE":
+                    if modo_seleccionado == "RETIRAR":
+                        status_var.set("Tapa depositada en banda de salida. Presioná CONTINUAR para siguiente tapa")
+                        set_buttons_enabled(False)
+                        btn_continuar.pack(pady=10)
+                    else:
+                        status_var.set("Movimiento completado. Esperando selección de nuevo modo...")
+                        set_buttons_enabled(False)
+                
+                elif line.startswith("Destino recibido"):
+                    status_var.set(line)
+                
+                else:
+                    # Mostrar otros mensajes informativos
+                    if "Sistema listo" in line or "Modo seleccionado" in line:
+                        status_var.set(line)
+        
+        except Exception as e:
+            print("Error lectura serial:", e)
+        
+        time.sleep(0.05)
+
+# Lanzar hilo lector
+if arduino is not None:
+    t = threading.Thread(target=serial_reader_thread, daemon=True)
+    t.start()
+
+# ===== Handler de cierre =====
+def on_close():
+    if arduino is not None:
+        try:
+            arduino.close()
+        except:
+            pass
+    root.destroy()
+
+root.protocol("WM_DELETE_WINDOW", on_close)
+root.mainloop()
