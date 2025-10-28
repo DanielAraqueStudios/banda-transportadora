@@ -267,45 +267,43 @@ void setup() {
   detenerMotorEntrada();
   detenerMotorSalida();
 
-  // Inicializar servomotor de INGRESAR
+  // Allocate timers for all 5 servos (ESP32 has 4 timers: 0,1,2,3)
   ESP32PWM::allocateTimer(0);
   ESP32PWM::allocateTimer(1);
+  ESP32PWM::allocateTimer(2);
+  ESP32PWM::allocateTimer(3);
+  
+  Serial.println("Inicializando todos los servos...");
+
+  // Servo Main (pin 21) - uses timer 0
   servoEmpujador.setPeriodHertz(50);
   servoEmpujador.attach(SERVO_PIN, 500, 2500);
   servoEmpujador.write(SERVO_POS_INICIAL);
-  Serial.println("Servo empujador (INGRESAR) inicializado en pin 21, posición 180°");
+  Serial.println("Servo empujador (pin 21) inicializado en 180°");
 
-  // Inicializar servomotores de RETIRAR (uno por compartimiento)
-  ESP32PWM::allocateTimer(2);
-    
-  Serial.println("Inicializando servos de compartimientos...");
-  
+  // Servo 1 (pin 16) - uses timer 1
   servoComp1.setPeriodHertz(50);
   servoComp1.attach(SERVO_COMP1_PIN, 500, 2500);
-  servoComp1.write(SERVO_RETIRAR_EMPUJE);  // Comp 1 invertido: inicia en 180°
-  Serial.print("Servo compartimiento 1 inicializado en pin ");
-  Serial.print(SERVO_COMP1_PIN);
-  Serial.println(" (INVERTIDO - posición 180°)");
+  servoComp1.write(SERVO_RETIRAR_EMPUJE);
+  Serial.println("Servo 1 (pin 16) inicializado en 180° (INVERTIDO)");
   
+  // Servo 2 (pin 17) - uses timer 2
   servoComp2.setPeriodHertz(50);
   servoComp2.attach(SERVO_COMP2_PIN, 500, 2500);
-  servoComp2.write(SERVO_RETIRAR_INICIAL);  // Comp 2 normal: inicia en 0°
-  Serial.print("Servo compartimiento 2 inicializado en pin ");
-  Serial.println(SERVO_COMP2_PIN);
+  servoComp2.write(SERVO_RETIRAR_INICIAL);
+  Serial.println("Servo 2 (pin 17) inicializado en 0°");
   
+  // Servo 3 (pin 22) - uses timer 2 (shared with servo 2)
   servoComp3.setPeriodHertz(50);
   servoComp3.attach(SERVO_COMP3_PIN, 500, 2500);
-  servoComp3.write(SERVO_RETIRAR_EMPUJE);  // Comp 3 invertido: inicia en 180°
-  Serial.print("Servo compartimiento 3 inicializado en pin ");
-  Serial.print(SERVO_COMP3_PIN);
-  Serial.println(" (INVERTIDO - posición 180°)");
+  servoComp3.write(SERVO_RETIRAR_EMPUJE);
+  Serial.println("Servo 3 (pin 22) inicializado en 180° (INVERTIDO)");
   
+  // Servo 4 (pin 13) - uses timer 3
   servoComp4.setPeriodHertz(50);
-  // Reutiliza el mismo timer del servoComp2
   servoComp4.attach(SERVO_COMP4_PIN, 500, 2500);
   servoComp4.write(SERVO_RETIRAR_INICIAL);
-  Serial.print("Servo compartimiento 4 inicializado en pin ");
-  Serial.println(SERVO_COMP4_PIN);
+  Serial.println("Servo 4 (pin 13) inicializado en 0°");
 
   
   Serial.println("Todos los servos de compartimientos (RETIRAR) inicializados en posición 0°");
