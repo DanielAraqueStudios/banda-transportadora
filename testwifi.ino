@@ -6,7 +6,7 @@ const char* ssid = "iPhone de Paisa";        // <- CAMBIAR: Nombre de tu red WiF
 const char* password = "Password123";     // <- CAMBIAR: Contraseña de tu red WiFi
 
 // ===== PIN DEL LED =====
-#define LED_PIN 5
+#define LED_PIN 2  // LED integrado del ESP32
 
 // ===== SERVIDOR WEB =====
 WebServer server(80);  // Servidor HTTP en puerto 80
@@ -64,9 +64,16 @@ void handleRoot() {
 
 // ===== FUNCIÓN: Encender LED =====
 void handleLedOn() {
+  Serial.println("\n========================================");
+  Serial.println("📥 SOLICITUD RECIBIDA: /on");
+  Serial.print("Cliente IP: ");
+  Serial.println(server.client().remoteIP());
+  
   ledState = true;
   digitalWrite(LED_PIN, HIGH);
-  Serial.println("LED ENCENDIDO ✅");
+  Serial.println("✅ LED ENCENDIDO en GPIO 2 (LED integrado)");
+  Serial.println("✅ Dato enviado: LED=ON");
+  Serial.println("========================================\n");
   
   // Redirigir a la página principal
   server.sendHeader("Location", "/");
@@ -75,9 +82,16 @@ void handleLedOn() {
 
 // ===== FUNCIÓN: Apagar LED =====
 void handleLedOff() {
+  Serial.println("\n========================================");
+  Serial.println("📥 SOLICITUD RECIBIDA: /off");
+  Serial.print("Cliente IP: ");
+  Serial.println(server.client().remoteIP());
+  
   ledState = false;
   digitalWrite(LED_PIN, LOW);
-  Serial.println("LED APAGADO ⛔");
+  Serial.println("⛔ LED APAGADO en GPIO 2 (LED integrado)");
+  Serial.println("✅ Dato enviado: LED=OFF");
+  Serial.println("========================================\n");
   
   // Redirigir a la página principal
   server.sendHeader("Location", "/");
@@ -104,11 +118,13 @@ void setup() {
   // Configurar pin del LED
   pinMode(LED_PIN, OUTPUT);
   digitalWrite(LED_PIN, LOW);
-  Serial.println("✅ LED configurado en GPIO 5");
+  Serial.println("✅ LED integrado configurado en GPIO 2");
   
   // Conectar a WiFi
   Serial.print("📡 Conectando a WiFi: ");
   Serial.println(ssid);
+  Serial.print("🔑 Contraseña: ");
+  Serial.println(password);
   
   WiFi.begin(ssid, password);
   
@@ -130,6 +146,13 @@ void setup() {
   }
   
   Serial.println("\n✅ WiFi conectado exitosamente!");
+  Serial.print("📶 Fuerza de señal (RSSI): ");
+  Serial.print(WiFi.RSSI());
+  Serial.println(" dBm");
+  Serial.print("🌐 Gateway: ");
+  Serial.println(WiFi.gatewayIP());
+  Serial.print("🎭 Máscara de subred: ");
+  Serial.println(WiFi.subnetMask());
   Serial.println("\n=================================");
   Serial.println("📍 DIRECCIÓN IP:");
   Serial.print("   http://");
@@ -157,7 +180,9 @@ void loop() {
   
   // Verificar si se perdió la conexión WiFi
   if (WiFi.status() != WL_CONNECTED) {
-    Serial.println("⚠️ Conexión WiFi perdida. Reconectando...");
+    Serial.println("\n⚠️ Conexión WiFi perdida. Reconectando...");
+    Serial.print("📡 Estado WiFi: ");
+    Serial.println(WiFi.status());
     WiFi.reconnect();
     delay(5000);
   }

@@ -1,6 +1,15 @@
 #include <Arduino.h>
 #include <Stepper.h>
 #include <ESP32Servo.h>
+#include <WiFi.h>
+#include <WebServer.h>
+
+// ===== CONFIGURACIÓN WIFI =====
+const char* ssid = "iPhone de Paisa";
+const char* password = "Password123";
+
+// ===== SERVIDOR WEB =====
+WebServer server(80);
 
 // ===== Sensores ultrasónicos =====
 #define TRIG1 14
@@ -245,6 +254,135 @@ void empujarTapaRetirar(int compartimiento) {
   Serial.println(compartimiento);
 }
 
+// ===== FUNCIONES WEB =====
+void handleRoot() {
+  String html = "<!DOCTYPE html><html lang='es'><head>";
+  html += "<meta charset='UTF-8'><meta name='viewport' content='width=device-width, initial-scale=1.0'>";
+  html += "<title>Control Banda Transportadora</title><style>";
+  html += "body{font-family:Arial;text-align:center;margin:20px;background:#1a1a1a;color:#fff}";
+  html += ".container{max-width:600px;margin:0 auto;padding:20px;background:#2a2a2a;border-radius:10px}";
+  html += "h1{color:#4CAF50}";
+  html += ".button{display:inline-block;padding:15px 30px;margin:10px;font-size:18px;border:none;border-radius:5px;cursor:pointer;text-decoration:none;color:#fff}";
+  html += ".btn-ingresar{background-color:#28a745}.btn-ingresar:hover{background-color:#218838}";
+  html += ".btn-retirar{background-color:#dc3545}.btn-retirar:hover{background-color:#c82333}";
+  html += ".btn-comp{background-color:#007bff;width:45%;margin:5px}.btn-comp:hover{background-color:#0056b3}";
+  html += ".status{font-size:18px;margin:20px;padding:15px;border-radius:5px;background:#444}";
+  html += "</style></head><body><div class='container'>";
+  html += "<h1>🏭 Control Banda Transportadora</h1>";
+  
+  // Estado actual
+  html += "<div class='status'>";
+  html += "Estado: <strong>";
+  if (stateMachine == WAITING_MODE) html += "Esperando modo";
+  else if (stateMachine == IDLE) html += "Esperando tapa";
+  else if (stateMachine == MOTOR_ON) html += "Transportando";
+  else if (stateMachine == WAIT_FOR_DESTINATION) html += "Seleccionar compartimiento";
+  else if (stateMachine == MOVING) html += "Moviendo stepper";
+  else if (stateMachine == PUSHING) html += "Empujando tapa";
+  html += "</strong><br>Modo: <strong>";
+  if (modoOperacion == MODE_INGRESAR) html += "INGRESAR";
+  else if (modoOperacion == MODE_RETIRAR) html += "RETIRAR";
+  else html += "NINGUNO";
+  html += "</strong></div>";
+  
+  // Botones de modo
+  html += "<h3>Seleccionar Modo:</h3>";
+  html += "<a href='/ingresar' class='button btn-ingresar'>⬇️ INGRESAR</a>";
+  html += "<a href='/retirar' class='button btn-retirar'>⬆️ RETIRAR</a>";
+  
+  // Botones de compartimientos
+  html += "<h3>Seleccionar Compartimiento:</h3>";
+  html += "<a href='/comp/1' class='button btn-comp'>Comp 1</a>";
+  html += "<a href='/comp/2' class='button btn-comp'>Comp 2</a><br>";
+  html += "<a href='/comp/3' class='button btn-comp'>Comp 3</a>";
+  html += "<a href='/comp/4' class='button btn-comp'>Comp 4</a>";
+  
+  html += "<p style='margin-top:30px;color:#888'>IP: " + WiFi.localIP().toString() + "</p>";
+  html += "</div></body></html>";
+  
+  server.send(200, "text/html", html);
+}
+
+void handleIngresar() {
+  Serial.println("[WiFi] Comando INGRESAR recibido");
+  procesarComando("INGRESAR");
+  server.sendHeader("Location", "/");
+  server.send(303);
+}
+
+void handleRetirar() {
+  Serial.println("[WiFi] Comando RETIRAR recibido");
+  procesarComando("RETIRAR");
+  server.sendHeader("Location", "/");
+  server.send(303);
+}
+
+void handleCompartimiento(int num) {
+  Serial.print("[WiFi] Compartimiento ");
+  Serial.print(num);
+  Serial.println(" recibido");
+  procesarComando(String(num));
+  server.sendHeader("Location", "/");
+  server.send(303);
+}
+
+void procesarComando(String cmd) {
+  // Simular recepción serial
+  if (cmd == "INGRESAR" || cmd == "RETIRAR") {
+    // Será procesado en loop como si viniera por serial
+    if (stateMachine == WAITING_MODE) {
+      if (cmd == "INGRESAR") {
+        if (motorSalidaEncendido) {
+          detenerMotorSalida();
+          Serial.println("Motor de salida detenido al cambiar a modo INGRESAR.");
+        }
+        modoOperacion = MODE_INGRESAR;
+        Serial.println("Modo seleccionado: INGRESAR");
+        if (currentPositionSteps != 0) {
+          Serial.println("Ajustando a posición 0° para modo INGRESAR...");
+          stepper.setSpeed(12);
+          long delta = -currentPositionSteps;
+          stepper.step(delta);
+          currentPositionSteps = 0;
+          Serial.println("Stepper en posición 0° (base para INGRESAR)");
+        }
+        definirPosiciones();
+        Serial.println("Sistema listo para ingresar tapas.");
+        stateMachine = IDLE;
+        Serial.println("MODE_CONFIRMED");
+      } else if (cmd == "RETIRAR") {
+        modoOperacion = MODE_RETIRAR;
+        Serial.println("Modo seleccionado: RETIRAR");
+        const float DEG_TO_STEPS = 2048.0 / 360.0;
+        long target180 = (long)(180 * DEG_TO_STEPS);
+        if (currentPositionSteps != target180) {
+          Serial.println("Moviendo a posición 180°...");
+          stepper.setSpeed(12);
+          long delta = target180 - currentPositionSteps;
+          stepper.step(delta);
+          currentPositionSteps = target180;
+          Serial.println("Stepper en posición 180°");
+        }
+        definirPosiciones();
+        encenderMotorSalida();
+        Serial.println("Sistema listo para retirar tapas.");
+        stateMachine = WAIT_FOR_DESTINATION;
+        Serial.println("MODE_CONFIRMED");
+        Serial.println("READY");
+      }
+    }
+  } else {
+    // Compartimiento
+    int num = cmd.toInt();
+    if (num >= 1 && num <= 4 && stateMachine == WAIT_FOR_DESTINATION) {
+      destino = num;
+      Serial.print("Destino recibido: ");
+      Serial.println(destino);
+      stateMachine = MOVING;
+    }
+  }
+}
+
 // ===== Setup =====
 void setup() {
   Serial.begin(115200);
@@ -257,60 +395,87 @@ void setup() {
   pinMode(IN1_DC, OUTPUT);
   pinMode(IN2_DC, OUTPUT);
 
-  // Configurar PWM para motor de entrada (versión moderna ESP32 Core 3.x)
-  ledcAttach(ENB, LEDC_FREQ, LEDC_RESOLUTION);
-  
-  // Configurar PWM para motor de salida (versión moderna ESP32 Core 3.x)
-  ledcAttach(ENA, LEDC_FREQ, LEDC_RESOLUTION);
-
   stepper.setSpeed(12);
-  detenerMotorEntrada();
-  detenerMotorSalida();
 
-  // Allocate timers for all 5 servos (ESP32 has 4 timers: 0,1,2,3)
+  // INICIALIZAR SERVOS PRIMERO (antes que PWM de motores)
   ESP32PWM::allocateTimer(0);
   ESP32PWM::allocateTimer(1);
   ESP32PWM::allocateTimer(2);
   ESP32PWM::allocateTimer(3);
   
-  Serial.println("Inicializando todos los servos...");
-
-  // Servo Main (pin 21) - uses timer 0
+  Serial.println("Inicializando servos...");
+  
   servoEmpujador.setPeriodHertz(50);
   servoEmpujador.attach(SERVO_PIN, 500, 2500);
   servoEmpujador.write(SERVO_POS_INICIAL);
   Serial.println("Servo empujador (pin 21) inicializado en 180°");
 
-  // Servo 1 (pin 16) - uses timer 1
   servoComp1.setPeriodHertz(50);
   servoComp1.attach(SERVO_COMP1_PIN, 500, 2500);
   servoComp1.write(SERVO_RETIRAR_EMPUJE);
   Serial.println("Servo 1 (pin 16) inicializado en 180° (INVERTIDO)");
   
-  // Servo 2 (pin 17) - uses timer 2
   servoComp2.setPeriodHertz(50);
   servoComp2.attach(SERVO_COMP2_PIN, 500, 2500);
   servoComp2.write(SERVO_RETIRAR_INICIAL);
   Serial.println("Servo 2 (pin 17) inicializado en 0°");
   
-  // Servo 3 (pin 22) - uses timer 2 (shared with servo 2)
   servoComp3.setPeriodHertz(50);
   servoComp3.attach(SERVO_COMP3_PIN, 500, 2500);
   servoComp3.write(SERVO_RETIRAR_EMPUJE);
   Serial.println("Servo 3 (pin 22) inicializado en 180° (INVERTIDO)");
   
-  // Servo 4 (pin 13) - uses timer 3
   servoComp4.setPeriodHertz(50);
   servoComp4.attach(SERVO_COMP4_PIN, 500, 2500);
   servoComp4.write(SERVO_RETIRAR_INICIAL);
   Serial.println("Servo 4 (pin 13) inicializado en 0°");
 
+  Serial.println("Todos los servos inicializados correctamente");
+
+  // AHORA configurar PWM para motores DC (después de servos)
+  ledcAttach(ENB, LEDC_FREQ, LEDC_RESOLUTION);
+  ledcAttach(ENA, LEDC_FREQ, LEDC_RESOLUTION);
   
-  Serial.println("Todos los servos de compartimientos (RETIRAR) inicializados en posición 0°");
+  detenerMotorEntrada();
+  detenerMotorSalida();
 
   // Iniciar en posición 0
   currentPositionSteps = 0;
   Serial.println("Stepper inicializado en posición 0");
+
+  // ===== INICIALIZAR WIFI =====
+  Serial.println("\n📡 Iniciando WiFi...");
+  Serial.print("Conectando a: ");
+  Serial.println(ssid);
+  
+  WiFi.begin(ssid, password);
+  
+  int attempts = 0;
+  while (WiFi.status() != WL_CONNECTED && attempts < 20) {
+    delay(500);
+    Serial.print(".");
+    attempts++;
+  }
+  
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.println("\n✅ WiFi conectado!");
+    Serial.print("📍 IP: http://");
+    Serial.println(WiFi.localIP());
+  } else {
+    Serial.println("\n⚠️ WiFi no conectado (continuando con serial)");
+  }
+  
+  // Configurar rutas web
+  server.on("/", handleRoot);
+  server.on("/ingresar", handleIngresar);
+  server.on("/retirar", handleRetirar);
+  server.on("/comp/1", []() { handleCompartimiento(1); });
+  server.on("/comp/2", []() { handleCompartimiento(2); });
+  server.on("/comp/3", []() { handleCompartimiento(3); });
+  server.on("/comp/4", []() { handleCompartimiento(4); });
+  
+  server.begin();
+  Serial.println("🌐 Servidor web iniciado\n");
 
   Serial.println("ESP32 listo. Estado: WAITING_MODE");
   Serial.println("MODE_REQUEST");
@@ -318,6 +483,8 @@ void setup() {
 
 // ===== Loop =====
 void loop() {
+  // Manejar peticiones HTTP
+  server.handleClient();
   
   // --- WAITING_MODE ---
   if (stateMachine == WAITING_MODE) {
