@@ -5,8 +5,8 @@
 #include <WebServer.h>
 
 // ===== CONFIGURACIÓN WIFI =====
-const char* ssid = "iPhone de Paisa";
-const char* password = "Password123";
+const char* ssid = "iPhone";
+const char* password = "123456789@";
 
 // ===== SERVIDOR WEB =====
 WebServer server(80);
@@ -431,6 +431,32 @@ void setup() {
   Serial.println("Servo 4 (pin 13) inicializado en 0°");
 
   Serial.println("Todos los servos inicializados correctamente");
+  
+  // ===== REINICIO DE POSICIONES (por si se movieron manualmente) =====
+  Serial.println("\n🔄 Verificando posiciones iniciales de todos los servos...");
+  delay(500);
+  
+  Serial.println("Reiniciando servo empujador (pin 21) -> 180°");
+  servoEmpujador.write(SERVO_POS_INICIAL);
+  delay(800);
+  
+  Serial.println("Reiniciando servo 1 (pin 16) -> 180° (INVERTIDO)");
+  servoComp1.write(SERVO_RETIRAR_EMPUJE);
+  delay(800);
+  
+  Serial.println("Reiniciando servo 2 (pin 17) -> 0°");
+  servoComp2.write(SERVO_RETIRAR_INICIAL);
+  delay(800);
+  
+  Serial.println("Reiniciando servo 3 (pin 22) -> 180° (INVERTIDO)");
+  servoComp3.write(SERVO_RETIRAR_EMPUJE);
+  delay(800);
+  
+  Serial.println("Reiniciando servo 4 (pin 13) -> 0°");
+  servoComp4.write(SERVO_RETIRAR_INICIAL);
+  delay(800);
+  
+  Serial.println("✅ Todos los servos en posición inicial correcta\n");
 
   // AHORA configurar PWM para motores DC (después de servos)
   ledcAttach(ENB, LEDC_FREQ, LEDC_RESOLUTION);
