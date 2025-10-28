@@ -433,27 +433,47 @@ void setup() {
   Serial.println("Todos los servos inicializados correctamente");
   
   // ===== REINICIO DE POSICIONES (por si se movieron manualmente) =====
-  Serial.println("\n🔄 Verificando posiciones iniciales de todos los servos...");
+  Serial.println("\n🔄 Reiniciando posiciones de todos los servos...");
   delay(500);
   
-  Serial.println("Reiniciando servo empujador (pin 21) -> 180°");
-  servoEmpujador.write(SERVO_POS_INICIAL);
+  Serial.println("Servo 1 (pin 16): 0° -> 180° -> 180° (posición inicial INVERTIDO)");
+  servoComp1.write(0);
+  delay(800);
+  servoComp1.write(180);
+  delay(800);
+  servoComp1.write(SERVO_RETIRAR_EMPUJE);  // 180° - posición inicial correcta
   delay(800);
   
-  Serial.println("Reiniciando servo 1 (pin 16) -> 180° (INVERTIDO)");
-  servoComp1.write(SERVO_RETIRAR_EMPUJE);
+  Serial.println("Servo 2 (pin 17): 0° -> 180° -> 0° (posición inicial)");
+  servoComp2.write(0);
+  delay(800);
+  servoComp2.write(180);
+  delay(800);
+  servoComp2.write(SERVO_RETIRAR_INICIAL);  // 0° - posición inicial correcta
   delay(800);
   
-  Serial.println("Reiniciando servo 2 (pin 17) -> 0°");
-  servoComp2.write(SERVO_RETIRAR_INICIAL);
+  Serial.println("Servo 3 (pin 22): 0° -> 180° -> 180° (posición inicial INVERTIDO)");
+  servoComp3.write(0);
+  delay(800);
+  servoComp3.write(180);
+  delay(800);
+  servoComp3.write(SERVO_RETIRAR_EMPUJE);  // 180° - posición inicial correcta
   delay(800);
   
-  Serial.println("Reiniciando servo 3 (pin 22) -> 180° (INVERTIDO)");
-  servoComp3.write(SERVO_RETIRAR_EMPUJE);
+  Serial.println("Servo 4 (pin 13): 0° -> 180° -> 0° (posición inicial)");
+  servoComp4.write(0);
+  delay(800);
+  servoComp4.write(180);
+  delay(800);
+  servoComp4.write(SERVO_RETIRAR_INICIAL);  // 0° - posición inicial correcta
   delay(800);
   
-  Serial.println("Reiniciando servo 4 (pin 13) -> 0°");
-  servoComp4.write(SERVO_RETIRAR_INICIAL);
+  Serial.println("Servo 5 - Empujador (pin 21): 0° -> 180° -> 180° (posición inicial)");
+  servoEmpujador.write(0);
+  delay(800);
+  servoEmpujador.write(180);
+  delay(800);
+  servoEmpujador.write(SERVO_POS_INICIAL);  // 180° - posición inicial correcta
   delay(800);
   
   Serial.println("✅ Todos los servos en posición inicial correcta\n");
